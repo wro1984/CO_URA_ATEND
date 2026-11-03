@@ -3,17 +3,18 @@
  * O site é público (GitHub Pages), então tudo vem cifrado. Este app NÃO tem chave própria: abre com a credencial que
  * o HUB dos apps (https://wro1984.github.io/) guardou no IndexedDB "co-hub-acesso" deste endereço, e só a LÊ.
  *
- * FORMATO (gerado pelo MAPI em ura_atend.py; mudar os dois juntos):
+ * FORMATO (gerado pelo MAPI em ura_atend.py; mudar os dois juntos). Todo conteúdo vem compactado (gzip, `z: 1`):
  *   dados.json = {app:"co-ura-atend", v:1, gerado_em,
  *                 hub:{acessos:{<id do HUB>:{salt, iv, ct}}},   id = SHA-256("hub:" + MATRÍCULA); salt = o do HUB
- *                 dados:{iv, ct}}                              JSON {agora, hoje, trad, hist:{hk, id, dias}} (AES-GCM 256)
- *   hist/<id>/<AAAA-MM-DD>.<hash>.json = {app, v, dia, iv, ct}: o dia, cifrado com a chave do histórico (`hk`).
+ *                 dados:{z, iv, ct}}             JSON {pulse, partes:{HH: caminho}, hist:{hk, id, dias, colunas}}
+ *   hoje/<id>/<dia>.<HH>.<hash>.json = {app, v, dia, hora, z, iv, ct}: uma hora fechada de hoje (leituras do Pulse);
+ *   hist/<id>/<AAAA-MM-DD>.<hash>.json = {app, v, dia, z, iv, ct}: um dia do histórico. Os dois com a chave `hk`.
  * A chave dos dados muda a cada publicação; a do histórico muda quando alguém sai do app (pasta nova).
  */
 (function (root) {
   'use strict';
 
-  const VERSAO = '1.0.0';
+  const VERSAO = '2.0.0';
   const APP = 'co-ura-atend';
   const C = (root.crypto && root.crypto.subtle) ? root.crypto : null;
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -45,11 +46,22 @@
     };
   });
 
+  // gzip -> texto (DecompressionStream: Chrome 80+, Safari 16.4+, Node 18+)
+  async function descompactar(bytes) {
+    if (typeof DecompressionStream === 'undefined')
+      throw erro('formato', 'Este navegador é antigo demais para o app (atualize o sistema ou o navegador).');
+    const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(s).text();
+  }
+
   async function decifrarJSON(k, campo, msg) {
     let bytes;
     try { bytes = await C.subtle.decrypt({ name: 'AES-GCM', iv: b64(campo.iv) }, k, b64(campo.ct)); }
     catch (e) { throw erro('corrompido', msg); }
-    try { return JSON.parse(new TextDecoder().decode(bytes)); }
+    let txt;
+    try { txt = campo.z ? await descompactar(bytes) : new TextDecoder().decode(bytes); }
+    catch (e) { if (e.code) throw e; throw erro('corrompido', msg); }
+    try { return JSON.parse(txt); }
     catch (e) { throw erro('corrompido', 'Os dados publicados estão em formato desconhecido.'); }
   }
 
@@ -71,15 +83,15 @@
     return { conteudo, chaveHist };
   }
 
-  // abre um arquivo de dia (hist/...) com a chave do histórico
-  async function abrirDia(arq, chaveHist) {
+  // abre um arquivo de dia (hist/...) ou de hora de hoje (hoje/...) com a chave do histórico
+  async function abrirArquivo(arq, chaveHist) {
     if (!C) throw erro('formato', 'Este navegador não tem criptografia.');
     if (!arq || arq.app !== APP || arq.v !== 1 || typeof arq.iv !== 'string' || typeof arq.ct !== 'string')
       throw erro('formato', 'Arquivo do histórico em formato desconhecido.');
     if (!chaveHist) throw erro('sem_acesso', 'Sem a chave do histórico.');
-    return decifrarJSON(chaveHist, arq, 'Um dia do histórico está corrompido.');
+    return decifrarJSON(chaveHist, arq, 'Um arquivo do histórico está corrompido.');
   }
 
-  const api = { VERSAO, abrir, abrirDia, lerCredHub, conferePacote };
+  const api = { VERSAO, abrir, abrirDia: abrirArquivo, abrirArquivo, lerCredHub, conferePacote };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.URAACripto = api;
 })(typeof self !== 'undefined' ? self : globalThis);

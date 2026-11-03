@@ -1,21 +1,21 @@
-# CO_URA_ATEND — URA Atendimento
+# CO_URA_ATEND — URA · Suporte B2C (produção)
 
-App web instalável no celular (PWA) com o atendimento da URA (Suporte B2C): o **Agora** (Genesys Pulse: em espera, NS,
-abandono, TMA, TME, agentes e o dia de hoje em blocos de 15 min) e o **Histórico** (um dia fechado dos últimos 90, do
-IPTBM), sempre contra a **média das últimas 7 semanas no mesmo dia da semana**. Recorte Total / CO / TEL, por grupo da
-tradutora e, ao abrir o grupo, por skill. Publicado pelo GitHub Pages em <https://wro1984.github.io/CO_URA_ATEND/> a
-partir da branch `main`. **Todo push na `main` vai para o ar em cerca de 1 minuto**, para todos os usuários.
+App web instalável no celular (PWA) com os alarmes e as filas do Suporte B2C na URA (CO e TEL): telas **Alarmes**,
+**Agora**, **Evolução** e **Skills**, com o histórico de 139 dias e o previsto pela mediana. É o app da **homologação**
+(`vivo61991-tech/ura-atendimento`, v1.31.0) com a entrada de dados trocada: em vez de `pulse.json` e `historico.csv`
+**abertos**, lê os arquivos **cifrados** que o MAPI publica, pelo **login do HUB**. Publicado pelo GitHub Pages em
+<https://wro1984.github.io/CO_URA_ATEND/> a partir da branch `main`. **Todo push na `main` vai para o ar em cerca de
+1 minuto**, para todos os usuários.
 
-**Topo padrão dos apps** (igual nos outros): botão de voltar ao HUB (`#btHub`) à esquerda, botões do app à direita. No
-desktop o topo e o menu de baixo ficam na coluna de 760 px do conteúdo.
+**Topo padrão dos apps**: botão de voltar ao HUB (`#btHub`) à esquerda, botões do app à direita.
 
 Leia este arquivo inteiro antes de mudar qualquer coisa.
 
 ## Como funciona
 
 ```
-Genesys Pulse ──► MAPI (pulse.py: leituras) ─┐
-IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias)┴─► dados.json + hist/<id>/<dia>.<hash>.json CIFRADOS ──► este repo ──► app
+Genesys Pulse ──► MAPI (pulse.py: leituras) ────┐
+IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias) ┴─► dados.json + hoje/… + hist/… CIFRADOS ──► este repo ──► app
                                                      (commit automático do MAPI)                         login do HUB
 ```
 
@@ -24,41 +24,51 @@ IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias)┴─► dados.json + his
 - **Não há chave própria**: o app abre com a credencial que o HUB dos apps guardou no IndexedDB `co-hub-acesso` deste
   endereço. Quem vê o app é definido no perfil do HUB (app `ura-atendimento`).
 
+## Onde está o quê
+
+| Arquivo | Papel | Igual à homologação? |
+|---|---|---|
+| `dados.js`, `graf.js`, `historico.js`, `alarmes.js` | contas, gráficos, histórico, alarmes | **sim** (copiar as versões novas de lá) |
+| `app.js` | telas e atualização | sim, menos `carregar()` / `carregarHist()` (usam o `fonte.js`), a tela de acesso e sem a cópia aberta no `localStorage` |
+| `index.html` | estrutura e estilos | sim, mais o botão do HUB, a seção `#pgAcesso` e os scripts `cripto.js` e `fonte.js`; endereços do `og:` deste site |
+| `fonte.js` | **só aqui**: devolve ao app o mesmo `pulse.json` (horas fechadas + hora aberta) e o mesmo `historico.csv` (remontado dos dias) | — |
+| `cripto.js` | **só aqui**: lê a credencial do HUB e abre os arquivos (AES-GCM + gzip) | — |
+| `sw.js` | **só aqui**: cache só deste app | — |
+| `dados.json`, `hoje/`, `hist/` | **gerados pelo MAPI — não editar** | — |
+
+**Trazer uma versão nova da homologação:** copie `dados.js`, `graf.js`, `historico.js`, `alarmes.js` e os testes que não
+usam dados reais. Em `app.js` e `index.html`, reaplique só as diferenças da tabela acima. Depois suba a versão (abaixo),
+rode `npm test` e teste no navegador.
+
 ## Regras que não podem ser quebradas
 
-1. **Nunca editar, apagar ou "consertar" o `dados.json` nem a pasta `hist/`.** São sobrescritos pelo MAPI.
-2. **Nunca commitar dados abertos nem segredos** (números reais, nomes reais de skills, prints, JSON decifrado, chaves).
-   O histórico do git é público. Para testar, use `tests/fixtures/pacote.json` (inventado, gerado com as funções do MAPI).
-3. **Não mudar o formato da criptografia sozinho.** `cripto.js` tem que bater com `ura_atend.py`:
-   - `dados.json`: `{app:"co-ura-atend", v:1, gerado_em, hub:{acessos:{id_hub:{salt, iv, ct}}}, dados:{iv, ct}}`;
+1. **Nunca editar, apagar ou "consertar" o `dados.json` nem as pastas `hoje/` e `hist/`.** São do MAPI.
+2. **Nunca commitar dados abertos nem segredos**: `pulse.json`, `historico.csv`, amostras reais (`tests/amostra.json`,
+   `tests/historico_amostra.csv`), o SQL com os nomes das skills, prints, chaves. O histórico do git é público. Para
+   testar, use `tests/fixtures/pacote.json` (inventado, gerado com as funções do MAPI).
+3. **Nada aberto guardado no aparelho.** A homologação guardava o último `pulse.json` no `localStorage`; aqui não (e
+   `usarCopia()` apaga essa cópia se existir). Sem rede, vale o `dados.json` cifrado no cache do service worker.
+4. **Não mudar o formato da criptografia sozinho.** `cripto.js` e `fonte.js` têm que bater com `ura_atend.py`:
+   - `dados.json`: `{app:"co-ura-atend", v:1, gerado_em, hub:{acessos:{id_hub:{salt, iv, ct}}}, dados:{z, iv, ct}}`;
      `id_hub` = SHA-256 de `"hub:" + MATRÍCULA`; `ct` do acesso = a chave dos dados cifrada com a chave do HUB;
-   - `dados.ct` = JSON `{agora, hoje, trad, hist:{hk, id, dias:{dia: caminho}}, colunas, desc_ura_s}`;
-   - `hist/<id>/<AAAA-MM-DD>.<hash>.json` = `{app, v, dia, iv, ct}` cifrado com a **chave do histórico** `hk`. O arquivo
-     de um dia **nunca muda** (conteúdo novo = nome novo); alguém saiu do app = chave nova = pasta nova.
+   - `dados` = JSON `{pulse (só a hora aberta), partes:{HH: caminho}, hist:{hk, id, dias:{dia: caminho}, colunas}, aviso}`;
+   - `hoje/<id>/<dia>.<HH>.<hash>.json` (uma hora fechada) e `hist/<id>/<dia>.<hash>.json` (um dia):
+     `{app, v, …, z, iv, ct}` com a chave do histórico `hk`. Nunca mudam (conteúdo novo = nome novo); alguém saiu do
+     app = chave nova = pasta nova;
+   - `z: 1` = o conteúdo é gzip antes de cifrar (`DecompressionStream`: Chrome 80+, Safari 16.4+).
    Mudança aqui tem que ser feita **junto** no MAPI.
-4. **A credencial do HUB só é LIDA**: nunca apagar, copiar ou criar o banco `co-hub-acesso`.
-5. **O service worker (`sw.js`) só mexe no que é deste app**: caches que começam com `co-ura-atend-` e pedidos dentro de
-   `/CO_URA_ATEND/`. `hist/` vai no cache `co-ura-atend-hist` (cache primeiro, atravessa versões).
-6. **Não carregar nada de fora** (CSP `default-src 'self'`).
-7. Acesso perdido: o app apaga o `dados.json` e os dias do cache.
-
-## Regras das contas (`calc.js`)
-
-- Linha de dia: `[i_horario, i_skill, of, at, ab, a60, a300, se, st, fi, em]`.
-- `of…st` somam no tempo e entre skills. `fi` (técnicos na fila no fim do bloco) soma entre skills e, em 30 min / 1 h,
-  vale o **último retrato**; no dia inteiro, o **maior**. `em` (espera do mais antigo) é sempre o maior.
-- **Qualidade só do CO** (atendidas, NS, abandono, TMA, TME, fila): na TEL toda chamada vem como abandonada e só o volume
-  vale. No Total, volume de todos e qualidade do CO.
-- NS = atendidas até 300 s ÷ atendidas (sem desconto de abandono curto). TME de hoje vem do Pulse (o Pulse não manda a
-  espera somada por bloco).
-- Agora (Pulse): agentes não se somam entre filas (o maior); EWT 10000 = sem agente (fica de fora).
+5. **A credencial do HUB só é LIDA**: nunca apagar, copiar ou criar o banco `co-hub-acesso`.
+6. **O service worker só mexe no que é deste app**: caches que começam com `co-ura-atend-` e pedidos dentro de
+   `/CO_URA_ATEND/`. `hoje/` e `hist/` vão no cache `co-ura-atend-hist` (cache primeiro, atravessa versões; o
+   `fonte.js` apaga dele o que saiu da publicação).
+7. **Não carregar nada de fora** (CSP `default-src 'self'`).
 
 ## Antes de cada push
 
 1. **Versão igual** em `APP_VERSION` (`app.js`), `VERSAO` (`cripto.js`), `VERSION` (`sw.js`) e nos `?v=` do `index.html`.
 2. Arquivo novo que o app usa? Inclua em `CORE` no `sw.js`.
 3. `npm test` e teste no navegador em ~390 px, claro e escuro.
-4. `git pull` antes do push (o MAPI faz commits). Use merge, não force-push.
+4. `git pull` antes do push (o MAPI faz commits a cada publicação). Use merge, não force-push.
 
 ## Testar localmente, sem dados reais
 
@@ -75,18 +85,6 @@ P
 cd /tmp/site && python -m http.server 8000                  # http://localhost:8000/CO_URA_ATEND/
 ```
 
-Sem a credencial do HUB no navegador o app mostra "Entre pelo HUB": sirva o HUB na raiz com um `hub.json` de teste da
-mesma pessoa, ou grave a credencial no IndexedDB (veja `credDoHub()` em `tests/cripto.test.js`).
-
-## Estrutura
-
-| Arquivo | Papel |
-|---|---|
-| `index.html` | estrutura, estilos (paleta da empresa, modo escuro), CSP |
-| `app.js` | telas Agora e Histórico, gráfico, grupos e skills, tabela por período; conferência a cada 2 min |
-| `calc.js` | contas (blocos, períodos, médias, grupos, agora do Pulse); roda também no Node |
-| `cripto.js` | lê a credencial do HUB, abre o `dados.json` e os dias |
-| `sw.js` | cache offline só deste app |
-| `manifest.webmanifest`, `icons/` | instalação no celular |
-| `tests/` | criptografia (pacote do MAPI), contas e versões |
-| `dados.json`, `hist/` | **gerados pelo MAPI — não editar** |
+O dia de teste é 03/11/2026 até 10:10: no navegador, simule a data (Playwright `clock.install`). Sem a credencial do HUB
+o app mostra "Entre pelo HUB": grave a credencial no IndexedDB (veja `credDoHub()` em `tests/cripto.test.js`).
+**Não commite** os arquivos de teste no lugar dos publicados pelo MAPI.

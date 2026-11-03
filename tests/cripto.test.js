@@ -26,9 +26,13 @@ test('abre o dados.json com a credencial do HUB e os dias com a chave do histór
   assert.ok(!('hk' in r.conteudo.hist), 'a chave crua não fica no objeto');
   const dias = Object.keys(r.conteudo.hist.dias);
   assert.strictEqual(dias.length, 8);
-  const d = await K.abrirDia(fx.arquivos[r.conteudo.hist.dias[dias[0]]], r.chaveHist);
+  const d = await K.abrirArquivo(fx.arquivos[r.conteudo.hist.dias[dias[0]]], r.chaveHist);
   assert.strictEqual(d.dia, dias[0]);
   assert.ok(d.l.length > 0 && d.l[0].length === 11);
+  const h = await K.abrirArquivo(fx.arquivos[r.conteudo.partes['08']], r.chaveHist);
+  assert.strictEqual(h.hora, '08');
+  assert.strictEqual(h.leituras.length, 4);
+  assert.strictEqual(fx.pacote.dados.z, 1);           // compactado antes de cifrar
 });
 
 test('sem o app no perfil, chave trocada ou errada: sem_acesso', async () => {
@@ -46,10 +50,10 @@ test('formato desconhecido e dados adulterados são recusados', async () => {
   const r = await K.abrir(fx.pacote, await credDoHub());
   const arq = JSON.parse(JSON.stringify(Object.values(fx.arquivos)[0]));
   arq.ct = Buffer.from('x'.repeat(40)).toString('base64');
-  assert.strictEqual((await K.abrirDia(arq, r.chaveHist).catch(e => e)).code, 'corrompido');
+  assert.strictEqual((await K.abrirArquivo(arq, r.chaveHist).catch(e => e)).code, 'corrompido');
 });
 
 test('nada aberto nos arquivos públicos', () => {
   const pub = JSON.stringify(fx.pacote) + JSON.stringify(fx.arquivos);
-  for (const t of ['VQ_EXEMPLO', 'FIBRA', fx.hub.matricula, fx.hk]) assert.ok(!pub.includes(t), t);
+  for (const t of ['VQ_COE_EXEMPLO', 'FIBRA', 'Distinct_Entered', fx.hub.matricula, fx.hk]) assert.ok(!pub.includes(t), t);
 });
