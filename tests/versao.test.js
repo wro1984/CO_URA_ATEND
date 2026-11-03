@@ -17,7 +17,7 @@ test('versões iguais', () => {
 
 test('todo arquivo do app está no CORE do service worker', () => {
   const core = ler('sw.js');
-  for (const f of ['index.html', 'app.js', 'cripto.js', 'calc.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'])
+  for (const f of ['index.html', 'app.js', 'cripto.js', 'fonte.js', 'dados.js', 'graf.js', 'historico.js', 'alarmes.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'])
     assert.ok(core.includes(`'${f}'`), f);
 });
 
@@ -31,4 +31,9 @@ test('nada carregado de fora', () => {
   const html = ler('index.html');
   assert.ok(!/(src|href)="https?:/.test(html));
   assert.match(html, /default-src 'self'/);
+});
+
+test('nada aberto guardado no aparelho (sem a cópia do pulse.json no localStorage)', () => {
+  assert.ok(!/localStorage\.setItem\(CK \+ 'ultimo'/.test(ler('app.js')));
+  assert.ok(!/fetch\('pulse\.json|historico\.csv'/.test(ler('app.js')));
 });

@@ -4,3 +4,6 @@
 *.xlsx
 acessos_local.json
 node_modules/
+pulse.json
+tests/amostra.json
+sql/
