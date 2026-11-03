@@ -1,0 +1,6 @@
+# Nunca commitar dados abertos nem segredos (o repositório é público).
+*.txt
+*.csv
+*.xlsx
+acessos_local.json
+node_modules/
