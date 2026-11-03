@@ -1,0 +1,7 @@
+{
+  "name": "co-ura-atend",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/cripto.test.js tests/calc.test.js tests/versao.test.js"
+  }
+}
