@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>URA Atendimento</title>
+<meta name="description" content="Atendimento da URA: agora (Genesys Pulse) e histórico de 90 dias, por grupo e skill.">
+<meta name="theme-color" content="#642A90">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{
+  --roxo:#642A90; --roxo2:#8549b5; --lil:#ebe0f4; --lil2:#f6f1fa;
+  --bg:#EFEAF5; --card:#ffffff; --ink:#1f1530; --ink2:#5b5068; --ink3:#9a90a8; --line:#e6e0ee;
+  --up:#c41a60; --upbg:#fde6ef; --down:#2f7a12; --downbg:#e8f5dc; --flat:#6b6178; --flatbg:#efeaf3;
+  --warn:#8a5a00; --warnbg:#fff3d6;
+  --f-body:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif; --f-num:ui-monospace,"SF Mono",Consolas,"Roboto Mono",monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#120A1A; --card:#221832; --ink:#efe9f6; --ink2:#bdb1cc; --ink3:#7d7190; --line:#352849; --lil:#33244a; --lil2:#1c1329;
+  --up:#ff6fa5; --upbg:#3f1226; --down:#9fd65a; --downbg:#22320f; --flat:#bdb1cc; --flatbg:#2c2140;
+  --warn:#ffd27a; --warnbg:#3a2a08; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);min-height:100vh;display:flex;flex-direction:column}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.topo{position:sticky;top:0;z-index:2;background:linear-gradient(135deg,#52227a,var(--roxo) 60%,var(--roxo2));color:#fff;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 12px max(14px,env(safe-area-inset-left,0px))}
+/* topo igual em todos os apps: voltar ao HUB à esquerda, botões do app à direita; no desktop, alinhado à coluna do conteúdo */
+.topo .row{display:flex;align-items:center;gap:10px;max-width:736px;margin:0 auto}
+.topo .t{flex:1;min-width:0}
+.topo h1{margin:0;font:700 17px/1.2 var(--f-body)}
+.topo small{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.92;min-height:16px}
+.vivo{width:7px;height:7px;border-radius:50%;background:#9fe86b;flex:none}
+.vivo.parado{background:#c9c0d4}
+.ib{width:40px;height:40px;border-radius:14px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center;flex:none;cursor:pointer;text-decoration:none;padding:0}
+.ib:active{background:rgba(255,255,255,.26)}
+.ib svg{width:20px;height:20px}
+.ib:focus-visible{outline:2px solid #fff;outline-offset:2px}
+main{flex:1;width:100%;max-width:760px;margin:0 auto;padding:12px max(12px,env(safe-area-inset-left,0px)) 90px;display:flex;flex-direction:column;gap:12px}
+.offline,.faixa{border-radius:12px;padding:9px 12px;font-size:13px;background:var(--warnbg);color:var(--warn)}
+.faixa.info{background:var(--lil);color:var(--ink2)}
+.var{display:inline-flex;align-items:center;gap:3px;font:600 11.5px/1 var(--f-num);padding:4px 6px;border-radius:7px;white-space:nowrap}
+.var.alta{color:var(--up);background:var(--upbg)}
+.var.baixa{color:var(--down);background:var(--downbg)}
+.var.estavel{color:var(--flat);background:var(--flatbg)}
+.secA{background:var(--card);border-radius:16px;padding:12px 12px 13px;box-shadow:0 1px 2px rgba(58,22,88,.06)}
+.secA h3{margin:0 0 9px;font:700 12px/1.2 var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--ink2);display:flex;justify-content:space-between;gap:8px}
+.secA h3 span{font:500 11px var(--f-num);letter-spacing:0;text-transform:none;color:var(--ink3);text-align:right}
+.gradeA{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cA{border:1px solid var(--line);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cA.destaque{grid-column:1/-1;background:var(--lil2)}
+.cA .n{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cA .v{font:700 21px/1.05 var(--f-num)}
+.cA.destaque .v{font-size:29px}
+.cA .l{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--ink3)}
+.vazio{margin:0;color:var(--ink2);font-size:13.5px}
+.tg .cab{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.alterna{display:inline-flex;border:1px solid var(--line);border-radius:99px;padding:2px;background:var(--card);flex:none}
+.alterna button{border:0;background:transparent;color:var(--ink2);font:600 11px var(--f-body);padding:7px 10px;border-radius:99px;cursor:pointer;min-height:30px}
+.alterna button[aria-pressed="true"]{background:var(--roxo);color:#fff}
+.alterna button:focus-visible{outline:2px solid var(--roxo2);outline-offset:1px}
+.tg svg{display:block;width:100%;height:auto;max-height:280px;margin-top:2px;cursor:pointer}
+.tg svg text{fill:var(--ink3);font:9.5px var(--f-num)}
+.leg{display:flex;gap:12px;font-size:11px;color:var(--ink2);flex-wrap:wrap}
+.leg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.leg i.tr{background:repeating-linear-gradient(90deg,var(--ink3) 0 4px,transparent 4px 7px)}
+.toque{font-size:11px;color:var(--ink3)}
+.bt{display:inline-flex;justify-content:center;align-items:center;min-height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--roxo);color:#fff;font:600 15px var(--f-body);text-decoration:none;cursor:pointer}
+.bt.sec{background:var(--lil);color:var(--roxo2);width:100%;margin-top:4px}
+.bt:focus-visible{outline:2px solid var(--roxo2);outline-offset:2px}
+.aviso-tela{background:var(--card);border-radius:16px;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:20px}
+.aviso-tela .ic{font-size:38px}
+.aviso-tela h2{margin:0;font:700 19px var(--f-body)}
+.aviso-tela p{margin:0 0 8px;color:var(--ink2);max-width:36ch}
+.carregando{color:var(--ink2);text-align:center;padding:40px 0}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:2;display:flex;justify-content:space-around;border-top:1px solid var(--line);background:var(--card);
+  padding:6px max(4px,calc((100% - 760px)/2)) calc(8px + env(safe-area-inset-bottom,0px))}
+nav button{flex:1;border:0;background:transparent;color:var(--ink3);font:500 11.5px var(--f-body);display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 18px;min-height:44px;cursor:pointer;border-radius:10px}
+nav button[aria-pressed="true"]{color:var(--roxo2);font-weight:700}
+nav button:focus-visible{outline:2px solid var(--roxo2)}
+nav svg{width:20px;height:20px}
+footer{font-size:11px;color:var(--ink3);text-align:center;padding:0 12px}
+.filtros{display:flex;justify-content:center}
+.ctrl{display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between;margin-bottom:6px}
+.cA .v small{font-size:12px;font-weight:500;color:var(--ink2)}
+.nota,.leg-ref{margin:8px 0 0;font-size:11.5px;color:var(--ink3)}
+.tg svg .grade{stroke:var(--line);stroke-width:1}
+.tg svg .barra{fill:var(--roxo2);opacity:.85}
+.tg svg .barra.sel{fill:var(--up);opacity:1}
+.tg svg .linha{fill:none;stroke:var(--ink2);stroke-width:1.6;stroke-dasharray:4 3}
+.leg i.br{width:10px;height:10px;border-radius:2px;background:var(--roxo2)}
+.leg i.ln{background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)}
+.gl{display:grid;grid-template-columns:minmax(0,1fr) 58px 52px 52px 50px;gap:6px;align-items:center;width:100%;border:0;border-top:1px solid var(--line);
+  background:transparent;color:var(--ink);font:13px var(--f-body);text-align:right;padding:9px 2px;min-height:44px;cursor:pointer}
+.gl.v1{grid-template-columns:minmax(0,1fr) 70px}
+.gl.cab{border-top:0;font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;min-height:0;padding:0 2px 4px;cursor:default}
+.gl .gn{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.gl.sk{background:var(--lil2);cursor:default;font-size:12px}
+.gl.sk .gn{font-weight:400;padding-left:14px;font-family:var(--f-num);font-size:10.5px;white-space:normal;word-break:break-all;line-height:1.25}
+.gl:focus-visible{outline:2px solid var(--roxo2);outline-offset:-2px}
+.navdia{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);border-radius:16px;padding:6px}
+.ib2{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:22px;cursor:pointer}
+.ib2:disabled{opacity:.35;cursor:default}
+.dsel{position:relative;flex:1;text-align:center;font-weight:700}
+.dsel select{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.tab{overflow-x:auto}
+.tab table{border-collapse:collapse;width:100%;font:12px var(--f-num);white-space:nowrap}
+.tab th{font:600 10.5px var(--f-body);color:var(--ink3);text-transform:uppercase;text-align:right;padding:4px 6px;position:sticky;top:0;background:var(--card)}
+.tab td{text-align:right;padding:6px;border-top:1px solid var(--line)}
+.tab th:first-child,.tab td:first-child{text-align:left}
+</style>
+</head>
+<body>
+<header class="topo"><div class="row">
+  <a class="ib" id="btHub" href="/" aria-label="Voltar ao HUB dos apps" title="HUB dos apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a>
+  <div class="t"><h1>URA Atendimento</h1><small id="sub"></small></div>
+  <button type="button" class="ib" id="btAtualizar" aria-label="Atualizar" title="Atualizar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+</div></header>
+<main>
+  <div class="offline" id="offline" hidden role="status"></div>
+  <div id="conteudo" style="display:flex;flex-direction:column;gap:12px"><div class="carregando">Abrindo…</div></div>
+  <footer id="rodape"></footer>
+</main>
+<nav id="nav" hidden aria-label="Telas">
+  <button type="button" data-aba="agora" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>Agora</button>
+  <button type="button" data-aba="hist" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Histórico</button>
+</nav>
+<script src="cripto.js?v=1.0.0"></script>
+<script src="calc.js?v=1.0.0"></script>
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>
