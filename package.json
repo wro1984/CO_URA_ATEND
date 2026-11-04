@@ -2,6 +2,6 @@
   "name": "co-ura-atend",
   "private": true,
   "scripts": {
-    "test": "node --test tests/cripto.test.js tests/fonte.test.js tests/versao.test.js && node tests/alarmes.test.js && node tests/compartilhar.test.js && node tests/graf.test.js"
+    "test": "node --test tests/cripto.test.js tests/fonte.test.js tests/fonte_cf.test.js tests/versao.test.js && node tests/alarmes.test.js && node tests/compartilhar.test.js && node tests/graf.test.js"
   }
 }

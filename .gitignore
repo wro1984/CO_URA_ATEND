@@ -7,3 +7,5 @@ node_modules/
 pulse.json
 tests/amostra.json
 sql/
+.dev.vars
+.wrangler/

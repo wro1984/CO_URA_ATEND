@@ -1,0 +1,16 @@
+name = "ura-atendimento-dados"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# Origens dos apps que leem os arquivos (separadas por vírgula; sem barra no final).
+ORIGENS_PERMITIDAS = "https://wro1984.github.io"
+# Apps aceitos (o primeiro trecho do endereço: /<app>/dados.json).
+APPS = "ura-atendimento"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dados-dos-apps"
+database_id = "COLE-AQUI-O-ID-DO-BANCO"
+
+# Segredo (NÃO vai neste arquivo):  npx wrangler secret put MAPI_CHAVE

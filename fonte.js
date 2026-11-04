@@ -6,6 +6,9 @@
  *   pulse()     -> o objeto do pulse.json: a hora aberta (dados.json) + as horas fechadas (hoje/…, guardadas no aparelho);
  *   historico() -> o texto do historico.csv, remontado dos dias (hist/…, guardados no aparelho, baixados só os novos).
  * Nada aberto é guardado no aparelho: só os arquivos cifrados, no cache do service worker.
+ * DE ONDE: `URAA_CONFIG.dados` (config.js) = endereço dos arquivos (o Worker da Cloudflare). Vazio = o próprio site
+ * (GitHub Pages), como antes. Em outro endereço o service worker não atende: os arquivos de dia e de hora (que nunca
+ * mudam) e a última cópia do dados.json (cifrada, para abrir sem rede) são guardados aqui mesmo, nos caches do app.
  * Erros com `code`: sem_cred (sem login do HUB neste aparelho), sem_acesso, sem_dados, rede, formato, corrompido.
  */
 (function (root) {
@@ -13,6 +16,15 @@
 
   const K = root.URAACripto;
   const CACHE_HIST = 'co-ura-atend-hist';
+  const CACHE_DADOS = 'co-ura-atend-dados';      // última cópia do dados.json vindo de outro endereço (cifrada)
+  const BASE = (function () {
+    const b = String((root.URAA_CONFIG && root.URAA_CONFIG.dados) || '').trim();
+    if (!b) return '';
+    if (!/^https:\/\/[^/?#]+\/[^?#]*$/.test(b)) throw new Error('config.js: endereço dos dados inválido');
+    return b.endsWith('/') ? b : b + '/';
+  })();
+  const url = caminho => BASE + caminho;          // com BASE vazio, o caminho relativo de sempre
+  const comCache = BASE && typeof root.caches !== 'undefined';
   const COLS_CSV = ['DIA', 'HORARIO', 'SKILL', 'OFERECIDAS', 'ATENDIDAS', 'ABANDONADAS', 'ATEND_60S', 'ATEND_300S',
     'SOMA_ESPERA_S', 'SOMA_TMA_S', 'FILA', 'ESPERA_MAX_S'];
   const erro = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
@@ -21,9 +33,21 @@
   const abertos = new Map();      // caminho -> conteúdo aberto (só na memória)
 
   async function baixarJSON(caminho, semCache) {
-    let r;
-    try { r = await fetch(caminho, semCache ? { cache: 'no-store' } : undefined); }
-    catch (e) { throw erro('rede', 'sem conexão com o site'); }
+    const u = url(caminho);
+    let r, c = null;
+    if (comCache) {
+      try { c = await caches.open(semCache ? CACHE_DADOS : CACHE_HIST); } catch (e) { c = null; }
+      // dia ou hora fechada: nunca muda, então o que já está no aparelho vale
+      if (c && !semCache) { try { r = await c.match(u); } catch (e) { r = null; } }
+    }
+    if (!r) {
+      try { r = await fetch(u, semCache ? { cache: 'no-store' } : undefined); }
+      catch (e) {
+        r = c && semCache ? await c.match(u).catch(() => null) : null;     // sem rede: a última cópia (cifrada)
+        if (!r) throw erro('rede', 'sem conexão com o site');
+      }
+      if (c && r.ok && r.clone) { try { await c.put(u, r.clone()); } catch (e) { /* sem espaço: segue sem guardar */ } }
+    }
     if (r.status === 404) throw erro('sem_dados', 'Ainda não há dados publicados.');
     if (!r.ok) throw erro('rede', 'o site respondeu ' + r.status);
     try { return await r.json(); } catch (e) { throw erro('formato', 'arquivo publicado em formato desconhecido'); }
@@ -35,6 +59,7 @@
     if (!('caches' in root)) return;
     try {
       await caches.delete(CACHE_HIST);
+      await caches.delete(CACHE_DADOS);
       for (const k of await caches.keys()) {
         if (!k.startsWith('co-ura-atend-v')) continue;
         const c = await caches.open(k);
@@ -48,10 +73,10 @@
     if (!('caches' in root) || !conteudo) return;
     try {
       const quer = new Set(Object.values(conteudo.hist.dias || {}).concat(Object.values(conteudo.partes || {}))
-        .map(p => new URL(p, location.href).href));
+        .map(p => new URL(url(p), location.href).href));
       const c = await caches.open(CACHE_HIST);
       for (const req of await c.keys()) if (!quer.has(req.url)) await c.delete(req);
-      for (const k of abertos.keys()) if (!quer.has(new URL(k, location.href).href)) abertos.delete(k);
+      for (const k of abertos.keys()) if (!quer.has(new URL(url(k), location.href).href)) abertos.delete(k);
     } catch (e) { /* segue */ }
   }
 
@@ -114,6 +139,6 @@
     return linhas.join('\n') + '\n';
   }
 
-  const api = { pulse, historico, atualizar, apagarCopias, credencial: () => cred, gerado: () => gerado, CACHE_HIST };
+  const api = { pulse, historico, atualizar, apagarCopias, credencial: () => cred, gerado: () => gerado, CACHE_HIST, BASE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.URAFonte = api;
 })(typeof self !== 'undefined' ? self : globalThis);

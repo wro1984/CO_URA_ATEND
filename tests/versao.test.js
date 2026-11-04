@@ -17,7 +17,7 @@ test('versões iguais', () => {
 
 test('todo arquivo do app está no CORE do service worker', () => {
   const core = ler('sw.js');
-  for (const f of ['index.html', 'app.js', 'cripto.js', 'fonte.js', 'dados.js', 'graf.js', 'historico.js', 'alarmes.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'])
+  for (const f of ['index.html', 'config.js', 'app.js', 'cripto.js', 'fonte.js', 'dados.js', 'graf.js', 'historico.js', 'alarmes.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'])
     assert.ok(core.includes(`'${f}'`), f);
 });
 
@@ -36,4 +36,16 @@ test('nada carregado de fora', () => {
 test('nada aberto guardado no aparelho (sem a cópia do pulse.json no localStorage)', () => {
   assert.ok(!/localStorage\.setItem\(CK \+ 'ultimo'/.test(ler('app.js')));
   assert.ok(!/fetch\('pulse\.json|historico\.csv'/.test(ler('app.js')));
+});
+
+test('o endereço dos dados (config.js) está liberado na CSP, e o config.js vem antes do fonte.js', () => {
+  const html = ler('index.html');
+  const m = ler('config.js').match(/dados: '([^']*)'/);
+  assert.ok(m, 'config.js com o campo dados');
+  if (m[1]) {
+    const origem = new URL(m[1]).origin;
+    assert.ok(m[1].startsWith('https://'));
+    assert.match(html.match(/connect-src ([^;]+);/)[1], new RegExp(`(^| )${origem.replace(/[.]/g, '\\.')}( |$)`));
+  }
+  assert.ok(html.indexOf('src="config.js') > 0 && html.indexOf('src="config.js') < html.indexOf('src="fonte.js'));
 });

@@ -4,10 +4,10 @@
  *   - app e dados.json: rede primeiro (sempre atualizados); sem rede, a última cópia (o dados.json fica cifrado);
  *   - hist/… e hoje/…: arquivo de dia ou de hora fechada NUNCA muda (nome novo quando muda) → cache primeiro, num cache
  *     próprio que atravessa versões (o app apaga dele o que saiu da publicação). */
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const CACHE = 'co-ura-atend-v' + VERSION;
 const CACHE_HIST = 'co-ura-atend-hist';
-const CORE = ['./', 'index.html', 'cripto.js', 'fonte.js', 'dados.js', 'graf.js', 'historico.js', 'alarmes.js', 'app.js',
+const CORE = ['./', 'index.html', 'config.js', 'cripto.js', 'fonte.js', 'dados.js', 'graf.js', 'historico.js', 'alarmes.js', 'app.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
