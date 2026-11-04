@@ -15,9 +15,14 @@ Leia este arquivo inteiro antes de mudar qualquer coisa.
 
 ```
 Genesys Pulse ──► MAPI (pulse.py: leituras) ────┐
-IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias) ┴─► dados.json + hoje/… + hist/… CIFRADOS ──► este repo ──► app
-                                                     (commit automático do MAPI)                         login do HUB
+IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias) ┴─► dados.json + hoje/… + hist/… CIFRADOS ──► Worker (ou repo) ──► app
+                                                     (PUT no Worker da Cloudflare, ou commit)           login do HUB
 ```
+
+- **Onde ficam os dados (desde a 2.1.0):** no Worker da Cloudflare (`worker/`, ver `worker/README.md`), endereço em
+  `config.js` (`dados`). O app em si (HTML, JS) continua aqui, no GitHub Pages. `dados: ''` = os dados no próprio site,
+  como na 2.0 (o MAPI com `URA_ATEND_DESTINO=github`). Trocou o endereço? Mude `config.js` e o `connect-src` da CSP no
+  `index.html` juntos (o teste confere).
 
 - O repositório e o site são **públicos**. Os números e os nomes das skills só existem aqui **cifrados**.
 - Quem gera e publica tudo é o **MAPI** (repositório `wro1984/mapi5`, `ura_atend.py`, ver `URA_ATEND.md` de lá).
@@ -33,6 +38,8 @@ IPTBM (Oracle) ──► MAPI (ura_atend.py: 139 dias) ┴─► dados.json + ho
 | `index.html` | estrutura e estilos | sim, mais o botão do HUB, a seção `#pgAcesso` e os scripts `cripto.js` e `fonte.js`; endereços do `og:` deste site |
 | `fonte.js` | **só aqui**: devolve ao app o mesmo `pulse.json` (horas fechadas + hora aberta) e o mesmo `historico.csv` (remontado dos dias) | — |
 | `cripto.js` | **só aqui**: lê a credencial do HUB e abre os arquivos (AES-GCM + gzip) | — |
+| `config.js` | **só aqui**: endereço dos dados (Worker da Cloudflare) | — |
+| `worker/` | **só aqui**: o Worker que guarda os arquivos cifrados (não é carregado pelo app) | — |
 | `sw.js` | **só aqui**: cache só deste app | — |
 | `dados.json`, `hoje/`, `hist/` | **gerados pelo MAPI — não editar** | — |
 
@@ -47,7 +54,8 @@ rode `npm test` e teste no navegador.
    `tests/historico_amostra.csv`), o SQL com os nomes das skills, prints, chaves. O histórico do git é público. Para
    testar, use `tests/fixtures/pacote.json` (inventado, gerado com as funções do MAPI).
 3. **Nada aberto guardado no aparelho.** A homologação guardava o último `pulse.json` no `localStorage`; aqui não (e
-   `usarCopia()` apaga essa cópia se existir). Sem rede, vale o `dados.json` cifrado no cache do service worker.
+   `usarCopia()` apaga essa cópia se existir). Sem rede, vale o `dados.json` cifrado no cache (do service worker, ou
+   `co-ura-atend-dados` quando os dados vêm do Worker).
 4. **Não mudar o formato da criptografia sozinho.** `cripto.js` e `fonte.js` têm que bater com `ura_atend.py`:
    - `dados.json`: `{app:"co-ura-atend", v:1, gerado_em, hub:{acessos:{id_hub:{salt, iv, ct}}}, dados:{z, iv, ct}}`;
      `id_hub` = SHA-256 de `"hub:" + MATRÍCULA`; `ct` do acesso = a chave dos dados cifrada com a chave do HUB;
@@ -60,8 +68,9 @@ rode `npm test` e teste no navegador.
 5. **A credencial do HUB só é LIDA**: nunca apagar, copiar ou criar o banco `co-hub-acesso`.
 6. **O service worker só mexe no que é deste app**: caches que começam com `co-ura-atend-` e pedidos dentro de
    `/CO_URA_ATEND/`. `hoje/` e `hist/` vão no cache `co-ura-atend-hist` (cache primeiro, atravessa versões; o
-   `fonte.js` apaga dele o que saiu da publicação).
-7. **Não carregar nada de fora** (CSP `default-src 'self'`).
+   `fonte.js` apaga dele o que saiu da publicação). Com os dados no Worker (outro endereço) o service worker não atende
+   esses pedidos: o próprio `fonte.js` guarda os arquivos nos mesmos caches.
+7. **Não carregar nada de fora** (CSP `default-src 'self'`). A única exceção é o `connect-src` do Worker dos dados.
 
 ## Antes de cada push
 

@@ -3,7 +3,7 @@
  * pulse.json e do historico.csv da homologação. Nada aberto é guardado no aparelho (sem a cópia no localStorage). */
 (function () {
   'use strict';
-  const APP_VERSION = '2.0.0';
+  const APP_VERSION = '2.1.0';
   const D = window.Dados, G = window.Graf, Hs = window.Historico, F = window.URAFonte;
   const HUB_URL = new URL('/', location.href).href;
 
