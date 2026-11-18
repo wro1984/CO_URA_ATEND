@@ -3,7 +3,7 @@
  * pulse.json e do historico.csv da homologação. Nada aberto é guardado no aparelho (sem a cópia no localStorage). */
 (function () {
   'use strict';
-  const APP_VERSION = '2.1.0';
+  const APP_VERSION = '2.2.0';
   const D = window.Dados, G = window.Graf, Hs = window.Historico, F = window.URAFonte;
   const HUB_URL = new URL('/', location.href).href;
 
@@ -1636,7 +1636,8 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden && origem !== 'arquivo') carregar(false); });
 
   $('#ver').textContent = APP_VERSION;
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  if (F.modoMapi()) $('#btHub').hidden = true;          // dentro do HUB de Apps do MAPI: sem o botão do HUB e sem service worker
+  else if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* sem offline: o app funciona igual */ });
   }
   usarCopia();
