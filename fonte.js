@@ -9,6 +9,9 @@
  * DE ONDE: `URAA_CONFIG.dados` (config.js) = endereço dos arquivos (o Worker da Cloudflare). Vazio = o próprio site
  * (GitHub Pages), como antes. Em outro endereço o service worker não atende: os arquivos de dia e de hora (que nunca
  * mudam) e a última cópia do dados.json (cifrada, para abrir sem rede) são guardados aqui mesmo, nos caches do app.
+ * MODO MAPI (`?mapi`, dentro de um quadro do "HUB de Apps" do MAPI): sem login do HUB, sem arquivos, sem cache. O app pede ao MAPI
+ * (`ura-atend:pronto` com `parte`: 'pulse' ou 'historico') e o MAPI responde `ura-atend:dados` com a mesma `parte`: o dia de hoje inteiro
+ * (`pulse`) ou os dias compactos em gzip+base64 (`historico`). Só vale a mensagem da janela pai. Nada disso vai para o aparelho.
  * Erros com `code`: sem_cred (sem login do HUB neste aparelho), sem_acesso, sem_dados, rede, formato, corrompido.
  */
 (function (root) {
@@ -28,6 +31,46 @@
   const COLS_CSV = ['DIA', 'HORARIO', 'SKILL', 'OFERECIDAS', 'ATENDIDAS', 'ABANDONADAS', 'ATEND_60S', 'ATEND_300S',
     'SOMA_ESPERA_S', 'SOMA_TMA_S', 'FILA', 'ESPERA_MAX_S'];
   const erro = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
+
+  // ---------- modo MAPI ----------
+  const modoMapi = () => !!(root.location && root.parent && root.parent !== root && new URLSearchParams(root.location.search || '').has('mapi'));
+  const ESPERA_MAPI_MS = 30000;
+  const pedidos = new Map();      // parte -> {promessa, res, rej, t}
+  let ouvindo = false;
+  function receberDoMapi(e) {
+    if (e.source !== root.parent || !e.data || e.data.tipo !== 'ura-atend:dados') return;
+    const p = pedidos.get(e.data.parte);
+    if (!p) return;
+    clearTimeout(p.t); pedidos.delete(e.data.parte);
+    if (e.data.erro) return p.rej(erro('rede', String(e.data.erro)));
+    p.res(e.data);
+  }
+  function pedirAoMapi(parte) {
+    if (pedidos.has(parte)) return pedidos.get(parte).promessa;
+    if (!ouvindo) { root.addEventListener('message', receberDoMapi); ouvindo = true; }
+    const p = {};
+    p.promessa = new Promise((res, rej) => { p.res = res; p.rej = rej; });
+    p.t = setTimeout(() => { pedidos.delete(parte); p.rej(erro('rede', 'O MAPI não respondeu: volte e abra o app de novo pelo HUB de Apps do MAPI.')); }, ESPERA_MAPI_MS);
+    pedidos.set(parte, p);
+    root.parent.postMessage({ tipo: 'ura-atend:pronto', parte }, '*');      // só o aviso e a parte pedida: nenhum dado
+    return p.promessa;
+  }
+  async function gunzipBase64(b64) {
+    if (typeof DecompressionStream === 'undefined') throw erro('formato', 'Este navegador não abre o histórico (precisa do Chrome 80+ ou Safari 16.4+).');
+    const bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return JSON.parse(await new Response(s).text());
+  }
+  // os dias compactos {dia, h, s, l} -> o texto do historico.csv, com as colunas do SELECT (com a fila)
+  function csvDeDias(dias) {
+    const linhas = [COLS_CSV.join(';')];
+    for (const d of dias) {
+      if (!d || !d.l) continue;
+      for (const l of d.l) linhas.push([d.dia, d.h[l[0]], d.s[l[1]]].concat(l.slice(2, 11).map(v => v == null ? '' : v)).join(';'));
+    }
+    return linhas.join('\n') + '\n';
+  }
 
   let cred = null, chaveHist = null, conteudo = null, gerado = null, idHist = null;
   const abertos = new Map();      // caminho -> conteúdo aberto (só na memória)
@@ -114,6 +157,11 @@
 
   // o pulse.json do dia: horas fechadas (arquivos) + a hora aberta (dados.json), em ordem de horário
   async function pulse() {
+    if (modoMapi()) {
+      const r = await pedirAoMapi('pulse');
+      if (!r.pulse || !Array.isArray(r.pulse.leituras)) throw erro('sem_dados', r.aviso ? String(r.aviso) : 'O MAPI ainda não tem leitura do Pulse para hoje.');
+      return r.pulse;
+    }
     await atualizar();
     const p = conteudo.pulse;
     if (!p) throw erro('sem_dados', conteudo.aviso || 'O MAPI ainda não tem leitura do Pulse para hoje.');
@@ -127,18 +175,20 @@
 
   // o historico.csv: um dia por arquivo, remontado com as colunas do SELECT (com a fila)
   async function historico() {
+    if (modoMapi()) {
+      const r = await pedirAoMapi('historico');
+      if (!r.b64) throw erro('sem_dados', 'O histórico ainda não foi carregado no MAPI.');
+      const dias = (await gunzipBase64(r.b64)).dias;
+      if (!Array.isArray(dias) || !dias.length) throw erro('sem_dados', 'O histórico ainda não foi carregado no MAPI.');
+      return csvDeDias(dias);
+    }
     if (!conteudo) await atualizar();
     const dias = Object.keys((conteudo.hist && conteudo.hist.dias) || {}).sort();
     if (!dias.length) throw erro('sem_dados', 'O histórico ainda não foi publicado.');
     const abertos_ = await abrirVarios(dias.map(d => conteudo.hist.dias[d]), 6);
-    const linhas = [COLS_CSV.join(';')];
-    for (const d of abertos_) {
-      if (!d || !d.l) continue;
-      for (const l of d.l) linhas.push([d.dia, d.h[l[0]], d.s[l[1]]].concat(l.slice(2, 11).map(v => v == null ? '' : v)).join(';'));
-    }
-    return linhas.join('\n') + '\n';
+    return csvDeDias(abertos_);
   }
 
-  const api = { pulse, historico, atualizar, apagarCopias, credencial: () => cred, gerado: () => gerado, CACHE_HIST, BASE };
+  const api = { pulse, historico, modoMapi, csvDeDias, atualizar, apagarCopias, credencial: () => cred, gerado: () => gerado, CACHE_HIST, BASE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.URAFonte = api;
 })(typeof self !== 'undefined' ? self : globalThis);

@@ -97,3 +97,12 @@ cd /tmp/site && python -m http.server 8000                  # http://localhost:8
 O dia de teste é 03/11/2026 até 10:10: no navegador, simule a data (Playwright `clock.install`). Sem a credencial do HUB
 o app mostra "Entre pelo HUB": grave a credencial no IndexedDB (veja `credDoHub()` em `tests/cripto.test.js`).
 **Não commite** os arquivos de teste no lugar dos publicados pelo MAPI.
+
+## Modo MAPI (desde a v2.2.0)
+
+Dentro do **HUB de Apps do MAPI** o app abre num quadro com `?mapi` na URL (`modoMapi()` em `fonte.js`): sem login do HUB, sem baixar `dados.json`/`hoje/`/`hist/`,
+sem cache e sem service worker; o botão do HUB some. O `fonte.js` pede ao MAPI por mensagem: `ura-atend:pronto` com `parte` (`pulse` = o dia de hoje inteiro,
+`historico` = os dias compactos em gzip + base64) e o MAPI responde `ura-atend:dados` com a mesma `parte` (ou `erro`). Só vale a mensagem da janela pai; o pedido leva
+só o aviso e a parte, nenhum dado. Os pedidos em andamento da mesma parte são compartilhados; sem resposta em 30 s o app mostra erro. O resto do app (telas,
+contas, gráficos) é o mesmo: `pulse()` e `historico()` devolvem o mesmo formato de sempre. Fora de um quadro, `?mapi` não muda nada. Não mude os nomes das mensagens
+nem das partes sem mudar `hub_embed.py` e `ura_atend.py` do MAPI junto. Testes: `tests/modo_mapi.test.js`.
